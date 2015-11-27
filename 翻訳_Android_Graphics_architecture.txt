@@ -557,15 +557,35 @@ So long as everybody follows the fencing rules, all of the queue-management IPC 
 
 ----------------
 Virtual Displays
+仮想ディスプレイ
 ----------------
 
-SurfaceFlinger supports a "primary" display, i.e. what's built into your phone or tablet, and an "external" display, such as a television connected through HDMI. It also supports a number of "virtual" displays, which make composited output available within the system. Virtual displays can be used to record the screen or send it over a network.
+SurfaceFlinger supports a "primary" display, i.e. what's built into your phone or tablet, and an "external" display, such as a television connected through HDMI.
+サーフェスフリンジャーはスマホやタブレットに組み込まれた"第一の"ディスプレイと、HDMIで接続されたテレビ等の"拡張"ディスプレイをサポートしている。
 
-Virtual displays may share the same set of layers as the main display (the "layer stack") or have its own set. There is no VSYNC for a virtual display, so the VSYNC for the primary display is used to trigger composition for all displays.
+It also supports a number of "virtual" displays, which make composited output available within the system.
+また、システム内で利用可能な合成されたアウトプットを作り出す、"仮想"ディスプレイもサポートしている。
 
-In the past, virtual displays were always composited with GLES. The Hardware Composer managed composition for only the primary display. In Android 4.4, the Hardware Composer gained the ability to participate in virtual display composition.
+Virtual displays can be used to record the screen or send it over a network.
+仮想ディスプレイは画面を録画したり、ネットワーク越しに送ったりするのに利用できる。
+
+Virtual displays may share the same set of layers as the main display (the "layer stack") or have its own set.
+仮想ディスプレイはメインディスプレイと同じレイヤーのセット(レイヤスタック)を共有したり、独自のセットを持ったりする。
+
+There is no VSYNC for a virtual display, so the VSYNC for the primary display is used to trigger composition for all displays.
+仮想ディスプレイにVSYNCはない。なので、主画面用のVSYNCをすべてのディスプレイの合成のトリガとする。
+
+In the past, virtual displays were always composited with GLES.
+過去には、仮想ディスプレイは常に GLES で合成されていた。
+
+The Hardware Composer managed composition for only the primary display.
+ハードウェアコンポーザは主ディスプレイの合成のみを管理していた。
+
+In Android 4.4, the Hardware Composer gained the ability to participate in virtual display composition.
+Android 4.4で、ハードウェアコンポーザは仮想ディスプレイの合成に参加する能力を得た。
 
 As you might expect, the frames generated for a virtual display are written to a BufferQueue.
+あなたが期待しているように、仮想ディスプレイ用に生成されたフレームはバッファキューに書かれる。
 
 ------------------------
 Case study: screenrecord
