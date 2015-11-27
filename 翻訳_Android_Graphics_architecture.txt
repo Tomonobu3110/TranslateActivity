@@ -547,3 +547,5 @@ That's because, when SurfaceFlinger acquires the new "back" buffer, it releases 
 The "front" buffer is still in use by the display, so anything that dequeues it must wait for the fence to signal before drawing on it.
 
 So long as everybody follows the fencing rules, all of the queue-management IPC requests can happen in parallel with the display.
+
+
