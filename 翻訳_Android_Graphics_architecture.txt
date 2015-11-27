@@ -555,4 +555,36 @@ The "front" buffer is still in use by the display, so anything that dequeues it 
 So long as everybody follows the fencing rules, all of the queue-management IPC requests can happen in parallel with the display.
 全員がフェンスのルールに従う限り、キュー管理のすべては、IPC要求が表示と並行して発生することがある。
 
+----------------
+Virtual Displays
+----------------
 
+SurfaceFlinger supports a "primary" display, i.e. what's built into your phone or tablet, and an "external" display, such as a television connected through HDMI. It also supports a number of "virtual" displays, which make composited output available within the system. Virtual displays can be used to record the screen or send it over a network.
+
+Virtual displays may share the same set of layers as the main display (the "layer stack") or have its own set. There is no VSYNC for a virtual display, so the VSYNC for the primary display is used to trigger composition for all displays.
+
+In the past, virtual displays were always composited with GLES. The Hardware Composer managed composition for only the primary display. In Android 4.4, the Hardware Composer gained the ability to participate in virtual display composition.
+
+As you might expect, the frames generated for a virtual display are written to a BufferQueue.
+
+------------------------
+Case study: screenrecord
+------------------------
+
+Now that we've established some background on BufferQueue and SurfaceFlinger, it's useful to examine a practical use case.
+
+The screenrecord command, introduced in Android 4.4, allows you to record everything that appears on the screen as an .mp4 file on disk. To implement this, we have to receive composited frames from SurfaceFlinger, write them to the video encoder, and then write the encoded video data to a file. The video codecs are managed by a separate process - called "mediaserver" - so we have to move large graphics buffers around the system. To make it more challenging, we're trying to record 60fps video at full resolution. The key to making this work efficiently is BufferQueue.
+
+The MediaCodec class allows an app to provide data as raw bytes in buffers, or through a Surface. We'll discuss Surface in more detail later, but for now just think of it as a wrapper around the producer end of a BufferQueue. When screenrecord requests access to a video encoder, mediaserver creates a BufferQueue and connects itself to the consumer side, and then passes the producer side back to screenrecord as a Surface.
+
+The screenrecord command then asks SurfaceFlinger to create a virtual display that mirrors the main display (i.e. it has all of the same layers), and directs it to send output to the Surface that came from mediaserver. Note that, in this case, SurfaceFlinger is the producer of buffers rather than the consumer.
+
+Once the configuration is complete, screenrecord can just sit and wait for encoded data to appear. As apps draw, their buffers travel to SurfaceFlinger, which composites them into a single buffer that gets sent directly to the video encoder in mediaserver. The full frames are never even seen by the screenrecord process. Internally, mediaserver has its own way of moving buffers around that also passes data by handle, minimizing overhead.
+
+---------------------------------------
+Case study: Simulate Secondary Displays
+---------------------------------------
+
+The WindowManager can ask SurfaceFlinger to create a visible layer for which SurfaceFlinger will act as the BufferQueue consumer. It's also possible to ask SurfaceFlinger to create a virtual display, for which SurfaceFlinger will act as the BufferQueue producer. What happens if you connect them, configuring a virtual display that renders to a visible layer?
+
+You create a closed loop, where the composited screen appears in a window. Of course, that window is now part of the composited output, so on the next refresh the composited image inside the window will show the window contents as well. It's turtles all the way down. You can see this in action by enabling "Developer options" in settings, selecting "Simulate secondary displays", and enabling a window. For bonus points, use screenrecord to capture the act of enabling the display, then play it back frame-by-frame.
