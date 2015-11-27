@@ -529,5 +529,21 @@ If the app starts rendering halfway between VSYNC signals, and SurfaceFlinger de
 もし、アプリがVSYNCの途中で描画を開始した場合、サーフェスフリンジャーはHWCのセットアップを、シグナルの到着予測より数ミリ秒前まで遅延する。われわれは遅延を2からたぶん1.5フレームに削減できる。
 
 In theory you could render and composite in a single period, allowing a return to double-buffering; but getting it down that far is difficult on current devices.
+理論的には、描画と合成が一回の間隔で収まれば、ダブルバッファの世界に戻れる。しかし、いまのデバイスでは大変難しいので、それは取り下げた。
 
 Minor fluctuations in rendering and composition time, and switching from overlays to GLES composition, can cause us to miss a swap deadline and repeat the previous frame.
+描画と合成の微妙な変動、そしてオーバーレイからGLESへのスイッチが、スワップのデッドラインに間に合わずに、前のフレームを繰り返す原因の可能性として存在する。
+
+SurfaceFlinger's buffer handling demonstrates the fence-based buffer management mentioned earlier.
+サーフェスフリンジャーのバッファ管理は、前述したフェンスベースの管理を言及している。
+
+If we're animating at full speed, we need to have an acquired buffer for the display ("front") and an acquired buffer for the next flip ("back").
+
+If we're showing the buffer on an overlay, the contents are being accessed directly by the display and must not be touched.
+But if you look at an active layer's BufferQueue state in the dumpsys SurfaceFlinger output, you'll see one acquired buffer, one queued buffer, and one free buffer.
+
+That's because, when SurfaceFlinger acquires the new "back" buffer, it releases the current "front" buffer to the queue.
+
+The "front" buffer is still in use by the display, so anything that dequeues it must wait for the fence to signal before drawing on it.
+
+So long as everybody follows the fencing rules, all of the queue-management IPC requests can happen in parallel with the display.
