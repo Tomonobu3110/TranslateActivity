@@ -1,0 +1,316 @@
+DRM
+デジタル著作権マネージメント
+
+This document provides an overview of the Android DRM framework, and introduces the interfaces a DRM plug-in must implement.
+このドキュメントはアンドロイドのDRMのフレームワークの外観をしめす。そして、DRMプラグインが実装しなければいけないインターフェースの紹介をする。
+
+This document does not describe robustness rules or compliance rules that may be defined by a DRM scheme.
+このドキュメントはDRMによって規定されるロバストネスルールやコンプライアンスるーるについては言及しない。
+
+============
+Introduction
+紹介
+============
+
+The Android platform provides an extensible DRM framework that lets applications manage rights-protected content according to the license constraints associated with the content.
+アンドロイドは、アプリケーションが著作権保護コンテンツをコンテンツに紐づくライセンスの制約に従って管理できる、拡張可能なDRMフレームワークを提供する。
+
+The DRM framework supports many DRM schemes; which DRM schemes a device supports is up to the device manufacturer.
+DRMフレームワークは数多くのDRMスキーマをサポートする。 (デバイスがサポートするDRM方式は、デバイスの製造元に任されている)
+
+The DRM framework introduced in Android 3.0 provides a unified interface for application developers and hides the complexity of DRM operations.
+Android3.0で導入されたDRMフレームワークは、アプリケーション開発者に統一されたインターフェースを提供し、DRM操作の複雑さを隠蔽します。
+
+The DRM framework provides a consistent operation mode for protected and non-protected content.
+DRMフレームワークは保護、非保護コンテンツの双方について首尾一貫した操作モードを提供します。
+
+DRM schemes can define very complex usage models by license metadata.
+DRMスキーマは、ライセンスのメタデータによって、非常に複雑なユーセージモデルを、定義できる。
+
+The DRM framework provides the association between DRM content and license, and handles the rights management.
+DRMフレームワークはDRMコンテンツととライセンスの紐付けを提供する。また、権利の管理をハンドルする。
+
+This enables the media player to be abstracted from DRM-protected or non-protected content.
+これはメディアプレイヤーがDRM保護コンテンツ、非保護コンテンツから抽象化されることを可能とする、
+
+See MediaDrm for the class to obtain keys for decrypting protected media streams.
+鍵取得やプロテクトされたメディアストリームの復号用のクラスについては MediaDrm を参照のこと。
+
+Figure 1. DRM Hardware Abstraction Layer
+図１．DRMハードウェア抽象化レイヤ
+
+Availability of rich digital content is important to users on mobile devices.
+モバイルデバイスのユーザにとってリッチなデジタルコンテンツが利用可能なことは重要である。
+
+To make their content widely available, Android developers and digital content publishers need a consistent DRM implementation supported across the Android ecosystem.
+コンテンツを広く利用できるために、アンドロイド開発者とデジタルコンテンツ発行者は、アンドロイドエコシステムでサポートされる、一貫したDRMの実装が必要である。
+
+To make that digital content available on Android devices and to ensure at least one consistent DRM available across all devices, Google provides DRM without license fees on compatible Android devices.
+アンドロイドデバイスでデジタルコンテンツを利用できるようにしたり、すべてのデバイスで少なくとも一つの一貫性があるDRMが利用可能であることを確実にするために、Googleはアンドロイドデバイス互換のラインセンスフリーなDRMを提供する。
+
+On Android 3.0 and higher platforms, the DRM plug-in is integrated with the Android DRM framework and can use hardware-backed protection to secure premium content and user credentials.
+アンドロイド3.0かそれ以降のプラットフォームでは、DRMプラグインがアンドロイドDRMフレームワークに統合されている。そして、プレミアムコンテンツとユーザの資格情報の保護に、hardware-backedな保護が利用できる。
+
+
+The content protection provided by the DRM plug-in depends on the security and content protection capabilities of the underlying hardware platform. 
+DRMプラグインで提供されるコンテンツ保護は、セキュリティと、ハードウェアプラット・フォームが基礎をなすコンテンツ保護能力に依存する。
+
+The hardware capabilities of the device include hardware secure boot to establish a chain of trust of security and protection of cryptographic keys.
+そのデバイスのハードウェアの能力は、信頼の鎖を確立するためのセキュアブートと環濠化された鍵の保護を含む。
+
+Content protection capabilities of the device include protection of decrypted frames in the device and content protection via a trusted output protection mechanism.
+そのデバイスのコンテンツ保護の能力は、デバイスでの復号されたフレームの保護と、信頼ある出力保護メカニズムを通じたコンテンツ保護を含む。
+
+Not all hardware platforms support all of the above security and content protection features.
+すべてのハードウェアプラットフォームがすべての上記のセキュリティとコンテンツ保護機能を有するわけではない。
+
+Security is never implemented in a single place in the stack, but instead relies on the integration of hardware, software, and services.
+セキュリティは一か所のスタックでは決して実装できず、ハードウェア、ソフトウェア、サービスの統合に頼っている。
+ 
+The combination of hardware security functions, a trusted boot mechanism, and an isolated secure OS for handling security functions is critical to providing a secure device.
+ハードウェアのセキュリティ機能、トラストブートの機構、そしてセキュア関数の実行をするための独立したセキュアOSがセキュアデバイスのかなめである。
+
+============
+Architecture
+アーキテクチャ
+============
+
+The DRM framework is designed to be implementation agnostic and abstracts the details of the specific DRM scheme implementation in a scheme-specific DRM plug-in.
+DRMフレームワークは、特定のスキームを持つDRMのプラグインの、特定のDRMスキームの実装の詳細について知らないで済む、かつ抽象化されたデザインになっている。
+
+The DRM framework includes simple APIs to handle complex DRM operations, register users and devices to online DRM services, extract constraint information from the license, associate DRM content and its license, and finally decrypt DRM content.
+DRMフレームワークは複雑なDRM操作をハンドルするための、シンプルなAPIを含む。オンラインのDRMサーバにユーザとデバイスを登録するとか、ライセンスから制約情報を取得するとか、DRMコンテンツをライセンスと結びつけるとか、最終的にコンテンツを復号するとか。
+
+The Android DRM framework is implemented in two architectural layers:
+アンドロイドDRMフレームワークは2層のアーキテクチャレイヤで実装されている。
+
+A DRM framework API, which is exposed to applications through the Android application framework and runs through the Dalvik VM for standard applications.
+DRMフレームワークAPIは、アンドロイドアプリケーションフレームワークを通してアプリに露出し、通常アプリ用のDalvik VMによって実行される。
+
+A native code DRM manager, which implements the DRM framework and exposes an interface for DRM plug-ins (agents) to handle rights management and decryption for various DRM schemes.
+ネーティブコードのDRMマネージャは、DRMフレームワークを実装し、権利の管理と、様々なDRMスキーマを復号するための、インターフェースをDRMプラグインに露出する。
+
+Figure 2. DRM framework
+図２．DRMフレームワーク
+
+For details, refer to the Android DRM package reference.
+詳細については、Android DRM package refernece を参照。
+http://developer.android.com/intl/ja/reference/android/drm/package-summary.html
+
+========
+Plug-ins
+プラグイン
+========
+
+As shown in the figure below, the DRM framework uses a plug-in architecture to support various DRM schemes.
+下記の図で示されるように、DRMフレームワークは数々のDRMスキーマをサポートするためにプラグインアーキテクチャを利用している。
+
+The DRM manager service runs in an independent process to ensure isolated execution of DRM plug-ins.
+DRMマネージャサービスは独立したプロセス実行される。これは、DRMプラグインの実行との隔離を確実にするため。
+
+Each API call from DrmManagerClient to DrmManagerService goes across process boundaries by using the binder IPC mechanism. 
+DrmManagerClientからDrmManagerServiceへのAPIコールはBinderのIPCメカニズムによってプロセス境界を超える。
+
+The DrmManagerClient provides a Java programming language implementation as a common interface to runtime applications;
+DrmManagerClientはランタイムアプリに共通インターフェースとしてJavaの実装を提供する。
+
+it also provides a DrmManagerClient-native implementation as the interface to native modules.
+【？】それはネーティブモジュールにインターフェースとして、DrmManagerClient-native実装をも提供する。
+
+The caller of DRM framework accesses only the DrmManagerClient and does not have to be aware of each DRM scheme.
+DRMフレームワークの呼び出し者はDrmManagerClientだけにアクセスし、各々のDRMスキームには気づかない。
+
+Figure 3. DRM framework with plug-ins
+図３．プラグインとDRMフレームワーク
+
+Plug-ins are loaded automatically when DrmManagerService is launched.
+プラグインはDrmManagerServiceがローンチされる際に、自動的にロードされる。
+
+As shown in the figure below, the DRM plug-in manager loads/unloads all the available plug-ins.
+下記の図の通り、DRMプラグインマネージャはすべての利用可能なプラグインをロード・アンロードする。
+
+The DRM framework loads plug-ins automatically by finding them under:
+下記のディレクトリ中に見つかったプラグインは自動的にロードされる。
+
+/system/lib/drm/plugins/native/
+
+Figure 4. DRM plug-in lifecycle
+図４．DRMプラグインのライフサイクル
+
+The plug-in developer should ensure the plug-in is located in the DRM framework plug-in discovery directory.
+プラグインの開発者はプラグインがDRMフレームワーク発見対象ディレクトリの中にあることを保証せねばならない。
+
+See implementation instructions below for details.
+実装の説明の詳細については以下を参照のこと。
+
+==============
+Implementation
+実装
+==============
+
+----------
+IDrmEngine
+----------
+
+IDrmEngine is an interface with a set of APIs for DRM use cases. 
+IDrmEngineはDRMユースケースの為のAPIセットをもつインターフェースである。
+
+Plug-in developers must implement the interfaces specified in IDrmEngine and the listener interfaces specified below. 
+プラグイン開発者はIDrmEngineに規定されるインターフェースと下記で示されるリスナインターフェースをを実装しなければならない。
+
+The interface definition is available in the source tree at:
+インターフェースの定義はソースツリーの以下の場所にある。
+
+<platform_root>/frameworks/base/drm/libdrmframework/plugins/common/include
+
+--------
+DRM Info
+--------
+
+DrmInfo is a wrapper class that wraps the protocol for communicating with the DRM server.
+DrmInfoはDRMサーバとの通信プロトコルのラッパクラスである。
+
+Server registration, deregistration, license acquisition, or any other server-related transaction can be achieved by processing an instance of DrmInfo.
+サーバ登録、登録解除、ライセンス取得、あるいは他のサーバ関連のトランザクションはDrmInfoのインスタンスを処理することによって達成することができる。
+
+The protocol should be described by the plug-in in XML format.
+プロトコルはプラグインによってXMLフォーマットによって記述されねばならない。
+
+Each DRM plug-in would accomplish the transaction by interpreting the protocol. 
+各々のDRMプラグインはプロトコルを解釈することによりトランザクションを達成する。
+
+The DRM framework defines an API to retrieve an instance of DrmInfo called acquireDrmInfo().
+DRMフレームワークは、aquireDrmInfo()とよばれる、DrmInfoのインスタンスを取得するAPIを定義する。
+
+DrmInfo* acquireDrmInfo(int uniqueId, const DrmInfoRequest* drmInfoRequest);
+Retrieves necessary information for registration, deregistration or rights acquisition information. See DrmInfoRequest for more information.
+登録、登録解除、権利獲得情報に必要な情報の獲得をする。詳細については DrmInfoRequest を参照のこと。
+
+DrmInfoStatus* processDrmInfo(int uniqueId, const DrmInfo* drmInfo);
+processDrmInfo() behaves asynchronously and the results of the transaction can be retrieved either from OnEventListener or OnErrorListener.
+processDrmInfoは非同期に動作し、トランザクションの結果は OnEventListener もしくは OnErrorListenerで取得できる。
+
+----------
+DRM rights
+----------
+
+The association of DRM content and the license is required to allow playback of DRM content.
+DRMコンテンツとライセンスの紐付けはDRMコンテンツの再生を許可するのに必要である。
+
+Once the association has been made, the license will be handled in the DRM framework so the Media Player application is abstracted from the existence of license.
+一度紐付けが確立されれば、ライセンスはDRMフレームワークでハンドルされる。よって、MediaPlayerアプリケーションはライセンスの存在から隔離される。
+
+int checkRightsStatus(int uniqueId, const String8& path, int action);
+
+Check whether the given content has valid rights or not. 
+コンテンツが有効な権利を持つかどうかチェックする。
+
+The input parameters are the content file path where the content was saved and the action to query rights for, for example: Action::DEFAULT, Action::PLAY.
+入力パラメタはコンテンツがセーブされているパス、および権利があるかチェックしたいアクション。 たとえばデフォルトとか再生とか。
+
+Returns the status of the rights for the protected content, such as RightsStatus::RIGHTS_VALID, RightsStatus::RIGHTS_EXPIRED.
+保護されたコンテンツの権利の状態を返す。たとえば、有効とか期限切れとか。
+
+status_t saveRights(int uniqueId, const DrmRights& drmRights, const String8& rightsPath, const String8& contentPath);
+Save DRM rights to the specified rights path and make association with content path.
+DRM権限を指定されたパスに保存し、コンテンツパスとの結合を作成する。
+ 
+The input parameters are the DrmRights to be saved, the rights file path where rights are to be saved, and the content file path where content was saved.
+パラメタは保存するDrmRight、権利が保存されるファイルパス、コンテンツが保存されているパス。
+
+----------------
+License Metadata
+----------------
+
+License metadata such as license expiry time, repeatable count and etc., may be embedded inside the rights of the protected content. 
+ライセンスの期限、繰り返し数などのライセンスメタデータは保護されたコンテンツの権利の中に組み込まれているかもしれない。
+
+The Android DRM framework provides APIs to return constraints associated with input content.
+アンドロイドDRMフレームワークは入力されたコンテンツに紐づけられた制約を返すAPIを提供する。
+
+See DrmManagerClient for more information.
+詳細についてはDrmManagerClientを参照のこと。
+
+DrmConstraints* getConstraints(int uniqueId, const String path, int action);
+The getConstraint function call returns key-value pairs of constraints embedded in protected content. 
+getConstraint関数呼び出しは 保護されたコンテンツに組み込まれた制約についての 鍵-値 のペアを返す。
+
+To retrieve the constraints, the uniqueIds (the Unique identifier for a session and path of the protected content) are required. 
+制約を取得するには uniqueIds (保護コンテンツのパスとセッションに関するユニークID) が必要となる。
+
+The action, defined as Action::DEFAULT, Action::PLAY, etc., is also required.
+アクション(デフォルトとか、再生とか定義された)も必要。
+
+Figure 5. Retrieve license metadata
+図５．ライセンスメタデータの取得
+
+DrmMetadata* getMetadata(int uniqueId, const String path);
+Get metadata information associated with input content for a given path of the protected content to return key-value pairs of metadata.
+指定パスの保護コンテンツで示される入力コンテンツと紐づけられたメタデータ情報の取得。メタデータは鍵-値のペアで返される。
+
+---------------
+Decrypt session
+---------------
+
+To maintain the decryption session, the caller of the DRM framework must invoke openDecryptSession() at the beginning of the decryption sequence. 
+復号セッションを維持するために、DRMフレームワークの呼び出し者はopenDecryptSession()を復号シーケンスの冒頭で呼ばなければならない。
+
+openDecryptSession() asks each DRM plug-in if it can handle input DRM content.
+openDecryptSession()は各DRMプラグインに、入力されたDRMコンテンツのハンドルが可能か尋ねる。
+
+status_t openDecryptSession( int uniqueId, DecryptHandle* decryptHandle, int fd, off64_t offset, off64_t length);
+
+The above call allows you to save DRM rights to specified rights path and make association with content path. 
+上記呼び出しによって指定した right パスへのDRM権利の保存と、コンテンツパスへの紐付けが可能となる。
+
+DrmRights parameter is the rights to be saved, file path where rights should be and content file path where content should be saved.
+DrmRightsのパラメータは、保存される権利、権利が保存されるファイルパス、コンテンツが保存されるパス。
+
+---------------------
+DRM plug-in Listeners
+---------------------
+
+Some APIs in DRM framework behave asynchronously in a DRM transaction. 
+DRMフレームワークのAPIの中には、DRMトランザクション中で非同期にふるまうものがある。
+
+An application can register three listener classes to DRM framework.
+アプリケーションは３つのリスナをDRMフレームワークに登録することができる。
+
+OnEventListener for results of asynchronous APIs
+OnEventListenerは非同期APIの結果取得のため。
+
+OnErrorListener for receiving errors of asynchronous APIs
+OnErrorLisntenerは非同期APIのエラー取得のため。
+
+OnInfoListener for any supplementary information during DRM transactions.
+OnInfoListenerはDRMトランザクション中の補足的な情報の取得のため。
+
+------
+Source
+------
+
+The Android DRM framework includes a passthru plug-in as a sample plug-in. 
+アンドロイドDRMフレームワークはサンプルプラグインとしてパススループラグインを含む。
+
+The implementation for passthru plug-in can be found in the Android source tree at:
+パススループラグインの実装は以下のディレクトリで見つかるよ。
+
+<platform_root>/frameworks/base/drm/libdrmframework/plugins/passthru
+
+---------------------
+Build and Integration
+---------------------
+
+Add the following to the Android.mk of the plug-in implementation. 
+プラグインの実装には Android.mk に以下を追加する。
+
+The passthruplugin is used as a sample.
+パススループラグインがサンプルとして使われている。
+
+PRODUCT_COPY_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/<plugin_library>:system/lib/drm/plugins/native/<plugin_library> e.g.,
+PRODUCT_COPY_FILES += $(TARGET_OUT_SHARED_LIBRARIES)/ libdrmpassthruplugin.so:system/lib/drm/plugins/native/libdrmpassthruplugin.so 
+
+Plug-in developers must locate their respective plug-ins under this directory like so:
+プラグイン開発者はそれぞれのプラグインを下記のディレクトリに配置しなければならない。こんな風に。
+
+/system/lib/drm/plugins/native/libdrmpassthruplugin.so

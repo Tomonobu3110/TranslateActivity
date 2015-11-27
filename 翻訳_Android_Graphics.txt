@@ -1,0 +1,304 @@
+Graphics
+グラフィック
+
+The Android framework offers a variety of graphics rendering APIs for 2D and 3D that interact with manufacturer implementations of graphics drivers, so it is important to have a good understanding of how those APIs work at a higher level. 
+アンドロイドフレームワークは、メーカー実装のグラフィックドライバと相互作用する、2Dと3D用の多様なグラフィック描画APIを、提供する。なので、これらのAPIがハイレベルでどのように動作するかをよく理解することは重要である。
+
+This page introduces the graphics hardware abstraction layer (HAL) upon which those drivers are built.
+【？】このページは紹介する、グラフィックHAL、うえに、それらのドライバが構築される
+
+Application developers draw images to the screen in two ways: with Canvas or OpenGL. 
+アプリケーション開発者は二つの方法で画面上に画像を描画する：キャンバスとOpenGL。
+
+See System-level graphics architecture for a detailed description of Android graphics components.
+アンドロイドのグラフィック・コンポーネントの詳細の記述については、システムレベル・グラフィック・アーキテクチャを参照のこと。
+
+android.graphics.Canvas is a 2D graphics API and is the most popular graphics API among developers.
+android.graphics.Canvasは2DグラフィックのAPIです。また、開発者の間でもっともよく知られたグラフィックAPIである。
+
+Canvas operations draw all the stock and custom android.view.Views in Android.
+【？】キャンバス操作は、Androidのすべてのストックとカスタム android.view.Views を描く。
+
+In Android, hardware acceleration for Canvas APIs is accomplished with a drawing library called OpenGLRenderer that translates Canvas operations to OpenGL operations so they can execute on the GPU.
+Androidでは、キャンバスAPI用のH/WアクセラレーションはOpenGLRendererという描画ライブラリによって達成されます。これは、キャンバスの操作をOpenGLの操作に変換するので、GPUでの実行が可能となる。
+
+Beginning in Android 4.0, hardware-accelerated Canvas is enabled by default.
+Android4.0以降、H/Wアクセラレーションキャンバスはデフォルトで有効になっている。
+
+Consequently, a hardware GPU that supports OpenGL ES 2.0 is mandatory for Android 4.0 and later devices.
+その結果、OpenGL ES 2.0 に対応した H/W GPUが、Android4.0以降で必須となった。
+
+See the Hardware Acceleration guide for an explanation of how the hardware-accelerated drawing path works and the differences in its behavior from that of the software drawing path.
+ハードウェアアクセラレーションの描画パスがどのように動くか、ソフトウェアの描画パスとどのように違うかの説明は、ハードウェアアクセラレーションガイドを参照のこと。
+
+In addition to Canvas, the other main way that developers render graphics is by using OpenGL ES to directly render to a surface.
+キャンバスに加えて、開発者がグラフィックを描画する他の主な手法は、サーフェスに OpenGL ES を使って直接描く方法。
+
+Android provides OpenGL ES interfaces in the android.opengl package that developers can use to call into their GL implementations with the SDK or with native APIs provided in the Android NDK.
+Androidは android.opengl パッケージで OpenGL ES のインターフェースを提供している。開発者はSDKか、Android NDKが提供するネイティブAPIを使って GL実装を呼ぶことができる。
+
+Android implementers can test OpenGL ES functionality using the drawElements Quality Program, also known as deqp.
+Android実装者は deqpとしても知られる、drawElements Qualityプログラムを OpenGL ESの機能テストに利用できる。
+
+===========================
+Android graphics components
+Androidグラフィックコンポーネント
+===========================
+
+No matter what rendering API developers use, everything is rendered onto a "surface."
+開発者がどの描画用APIを使おうが、すべては "サーフェス" の上に描画される。
+
+The surface represents the producer side of a buffer queue that is often consumed by SurfaceFlinger.
+サーフェスはバッファ・キューの生産者側を表現します。消費者はだいたいサーフェスフリンジャー。
+ 
+Every window that is created on the Android platform is backed by a surface.
+アンドロイドプラットフォームで生成されたすべてのウィンドウの背後にはサーフェスがある。
+
+All of the visible surfaces rendered are composited onto the display by SurfaceFlinger.
+全ての描画された可視のサーフェスは、サーフェスフリンジャーによってディスプレイの上に合成される。
+
+The following diagram shows how the key components work together:
+下記の図は鍵となるコンポーネントが協業する様子を示している。
+
+Figure 1. How surfaces are rendered
+図１．いかに surface が描画されるか
+
+The main components are described below:
+以下、主要なコンポーネントについて
+
+----------------------
+Image Stream Producers
+イメージ・ストリーム・生産者
+----------------------
+
+An image stream producer can be anything that produces graphic buffers for consumption.
+消費されるグラフィックバッファを精算するものは何であれイメージストリームプロ生産者になることができる。
+
+Examples include OpenGL ES, Canvas 2D, and mediaserver video decoders.
+たとえば、OpenGL ES、2Dのキャンバス、メディアサーバのビデオデコーダなど。
+
+----------------------
+Image Stream Consumers
+イメージ・ストリーム・消費者
+----------------------
+
+The most common consumer of image streams is SurfaceFlinger, the system service that consumes the currently visible surfaces and composites them onto the display using information provided by the Window Manager. 
+もっとも一般的なイメージストリームの消費者はサーフェスフリンジャーである。このシステムサービスは現在見えているサーフェスを消費し、ウィンドウマネージャの提供する情報を用いながら、ディスプレイの上に合成する。
+
+SurfaceFlinger is the only service that can modify the content of the display.
+サーフェスフリンジャーは、ディスプレイコンテンツを編集できるたった一つのサービス。
+
+SurfaceFlinger uses OpenGL and the Hardware Composer to compose a group of surfaces.
+サーフェスフリンジャーは、OpenGLとハードウェアコンポーザを利用してサーフェイスのグループを合成(集約)する。
+ 
+Other OpenGL ES apps can consume image streams as well, such as the camera app consuming a camera preview image stream. 
+他の OpenGL ES アプリも同様にイメージストリームを消費できる。たとえば、カメラアプリがカメラプレビューのイメージストリームを消費するように。
+
+Non-GL applications can be consumers too, for example the ImageReader class.
+GLでないアプリケーションも消費者になれる。たとえば ImageReaderクラス のように。
+
+--------------
+Window Manager
+ウインドウ・マネージャ
+--------------
+
+The Android system service that controls a window, which is a container for views.
+ウィンドウを制御するアンドロイドのシステムサービスで、ビューのコンテナ。
+
+A window is always backed by a surface.
+ウィンドウはいつでも裏にサーフェスがいる。
+
+This service oversees lifecycles, input and focus events, screen orientation, transitions, animations, position, transforms, z-order, and many other aspects of a window.
+このサービスは、ライフサイクル、入力とフォーカスのイベント、画面の向き、遷移、アニメーション、位置、変形、Zオーダー、他多数のウィンドウの様相を監督する
+
+The Window Manager sends all of the window metadata to SurfaceFlinger so SurfaceFlinger can use that data to composite surfaces on the display.
+ウィンドウサービスはウィンドウメタデータのすべてをサーフェスフリンジャーに送るので、サーフェスフリンジャーはそのデータをディスプレイ上へのサーフェスの合成に利用できる。
+
+-----------------
+Hardware Composer
+ハードウェア・コンポーザ
+-----------------
+
+The hardware abstraction for the display subsystem.
+ディスプレイシステムの為のハードウェアの抽象化。
+
+SurfaceFlinger can delegate certain composition work to the Hardware Composer to offload work from OpenGL and the GPU.
+サーフェスフリンジャーは、OpenGLとGPUから作業をオフロードするために、一定の合成作業を、ハードウェア・コンポーザに委任できる。
+
+SurfaceFlinger acts as just another OpenGL ES client.
+サーフェスフリンジャーはほかのOpenGL ES クライアントと同じようにふるまう。
+
+So when SurfaceFlinger is actively compositing one buffer or two into a third, for instance, it is using OpenGL ES.
+なので、サーフェスフリンジャーが一つか二つのバッファを三つ目に合成しているとき、それは OpenGL ES を利用する。
+
+This makes compositing lower power than having the GPU conduct all computation.
+このことは合成を、全部GPUに計算させるよりも、低いパワーで行えるようにしている。
+
+The Hardware Composer HAL conducts the other half of the work.
+ハードウェアコンポーザ HAL は、他の半分の仕事を指揮する。
+
+This HAL is the central point for all Android graphics rendering.
+このHALは Android のグラフィック描画すべての中心である。
+
+Hardware Composer must support events, one of which is VSYNC. 
+ハードウェアコンポーザはイベントをサポートしなければならない。たとえば一つ上げればVSYNCのような。
+
+Another is hotplug for plug-and-play HDMI support.
+他は プラグアンドプレイ HDMI サポートの為のホットプラグ。
+
+See the Hardware Composer HAL section for more information.
+詳細については、ハードウェアコンポーザHALセクションを参照のこと。
+
+-------
+Gralloc
+GRアロケータ
+-------
+
+The graphics memory allocator is needed to allocate memory that is requested by image producers.
+イメージ生産者に要求されたメモリをアロケートするために、グラフィックメモリアロケータが必要。
+
+See the Gralloc HAL section for more information.
+詳細については、グラフィックHALのセクションを参照のこと。
+
+=========
+Data flow
+データフロー
+=========
+
+See the following diagram for a depiction of the Android graphics pipeline:
+アンドロイドグラフィックパイプラインの描画については下記の図をみよ。
+
+Figure 2. Graphic data flow through Android
+アンドロイドを通したグラフィックのデーターフロー
+
+The objects on the left are renderers producing graphics buffers, such as the home screen, status bar, and system UI.
+左のオブジェクトはグラフィックバッファを生産するレンダラー。ホーム画面とか、ステータスバーとかシステムUIとか。
+
+SurfaceFlinger is the compositor and Hardware Composer is the composer.
+サーフェスフリンジャーは compsitor(植字工)で、ハードウェアコンポーザはコンポーザー。
+【註】compositor/composerの差
+http://www.weblearneng.com/composer-compositor
+
+-----------
+BufferQueue
+バッファキュー
+-----------
+
+BufferQueues provide the glue between the Android graphics components.
+バッファキューはアンドロイドグラフィックコンポーネント間の接着剤を提供する。
+
+These are a pair of queues that mediate the constant cycle of buffers from the producer to the consumer.
+これらは、生産者から消費者への定常的なバッファーのサイクルに介在する、ペアのキューである。
+
+Once the producers hand off their buffers, SurfaceFlinger is responsible for compositing everything onto the display.
+いったん生産者の手を離れたバッファーは、サーフェスフリンジャーがそれらのすべてをディスプレイの上に合成する責任を持つ。
+
+See the following diagram for the BufferQueue communication process.
+バッファキューのコミュニケーションプロセスについては下記の図を参照のこと。
+
+Figure 3. BufferQueue communication process
+図３．バッファキューコミュニケーションプロセス
+
+BufferQueue contains the logic that ties image stream producers and image stream consumers together.
+バッファキューは、イメージストリーム生産者とイメージストリーム消費者を互いに結びつけるロジックを含む。
+
+Some examples of image producers are the camera previews produced by the camera HAL or OpenGL ES games.
+たとえば、イメージ生産者とは、カメラHALによって作られるカメラプレビューとか、OpenGL ESのゲームとか。
+
+Some examples of image consumers are SurfaceFlinger or another app that displays an OpenGL ES stream, such as the camera app displaying the camera viewfinder.
+たとえば、イメージ消費者とは、サーフェスフリンジャーとか、カメラのヴューファインダーを表示するカメラアプリのような OpenGL ES ストリームを表示するアプリ。
+
+BufferQueue is a data structure that combines a buffer pool with a queue and uses Binder IPC to pass buffers between processes.
+【？】バッファキューは、データ構造である。組み合わせる、キュー構造を持つバッファプール、プロセス間のバッファやり取りの為にバインダーIPCを利用する。
+
+The producer interface, or what you pass to somebody who wants to generate graphic buffers, is IGraphicBufferProducer (part of SurfaceTexture).
+【？】生産者のインターフェース、あなたがグラフィックバッファを作りたい誰かにパスする何か、は IGraphicBufferProducer である。 (SurfceTextureの一部)
+
+BufferQueue is often used to render to a Surface and consume with a GL Consumer, among other tasks.
+【？】バッファキューは、サーフェスに描画するのに、そして、他のタスクの間で、GL消費者と消費するのに、しばしば使われる、
+
+BufferQueue can operate in three different modes:
+バッファキューは3つの異なるモードで運用できる。
+
+Synchronous-like mode - BufferQueue by default operates in a synchronous-like mode, in which every buffer that comes in from the producer goes out at the consumer.
+同期的モード - バッファキューはデフォルトでは同規定モード。生産者からやってきた一つ一つののバッファは消費者に届く。
+
+No buffer is ever discarded in this mode. 
+このモードでバッファは破棄されない。
+
+And if the producer is too fast and creates buffers faster than they are being drained, it will block and wait for free buffers.
+そしてもし生産者が、バッファが排水(= 消費)されるよりも早くバッファを作る場合、ブロックされ、バッファがあくまで待たされる。
+
+Non-blocking mode - BufferQueue can also operate in a non-blocking mode where it generates an error rather than waiting for a buffer in those cases. 
+ノンブロックモード - これらのケースで待たされるよりもエラーを出すのに、ノンブロックモードでバッファキューを運用できる。
+
+No buffer is ever discarded in this mode either. 
+このモードでもバッファは破棄されない。
+
+This is useful for avoiding potential deadlocks in application software that may not understand the complex dependencies of the graphics framework.
+これはグラフィックフレームワークの依存の複雑さを理解しないアプリのデッドロックの可能性を避けるのによい。
+
+Discard mode - Finally, BufferQueue may be configured to discard old buffers rather than generate errors or wait.
+切り捨てモード - 最後は、エラーや待機よりも古いバッファを破棄する設定。
+
+For instance, if conducting GL rendering to a texture view and drawing as quickly as possible, buffers must be dropped.
+例えば、テクスチャビューにGLレンダリングを行い、可能な限り迅速に描画する場合、バッファは削除する必要がある。
+
+To conduct most of this work, SurfaceFlinger acts as just another OpenGL ES client.
+この作業のほとんどを行うために、SurfaceFlingerは別のOpenGL ESクライアントとして動作する。
+
+So when SurfaceFlinger is actively compositing one buffer or two into a third, for instance, it is using OpenGL ES.
+【？】なので、サーフェスフリンジャーが積極的に一つか二つのバッファを三つ目に合成しているとき、たとえば、それはOpenGL ESを使う。
+
+The Hardware Composer HAL conducts the other half of the work. 
+ハードウェアコンポーザ HAL は、他の半分の仕事を指揮する。
+
+This HAL acts as the central point for all Android graphics rendering.
+このHALは Android のグラフィック描画すべての中心としてふるまう。
+
+-------------------------
+Synchronization framework
+同期フレームワーク
+-------------------------
+
+Since Android graphics offer no explicit parallelism, vendors have long implemented their own implicit synchronization within their own drivers.
+Androidグラフィックが明確な並列処理を提供していなかったので、ベンダーは長い事彼ら自身で明確な動機を彼ら字指針のドライバの中に実装していた。
+
+This is no longer required with the Android graphics synchronization framework.
+Androidのグラフィック同期フレームワークを利用すれば、これはもう必要ない。
+
+See the Explicit synchronization section for implementation instructions.
+実装の手順については、明確な動機セクションを参照のこと。
+
+The synchronization framework explicitly describes dependencies between different asynchronous operations in the system.
+同期フレームワークは、システムの異なる非同期操作のあいだの依存関係を、明確に記述する。
+
+The framework provides a simple API that lets components signal when buffers are released.
+フレームワークはバッファがリリースされたときにコンポーネントにシグナルさせるシンプルなAPIを提供する。
+
+It also allows synchronization primitives to be passed between drivers from the kernel to userspace and between userspace processes themselves.
+また、それは、同期プリミティブが、ユーザ空間カーネルからドライバとの間や、ユーザ空間プロセス自身の間通過することを可能にする。
+
+For example, an application may queue up work to be carried out in the GPU.
+たとえば、アプリケーションはGPUで実行される仕事を積み上げるかもしれない。
+
+The GPU then starts drawing that image.
+そして、GPUがそのイメージの描画を開始する。
+
+Although the image hasn’t been drawn into memory yet, the buffer pointer can still be passed to the window compositor along with a fence that indicates when the GPU work will be finished. 
+【？】イメージがメモリに描画されていなくても、そのバッファのポインターはウインドウコンポジタに対して、GPUの仕事が終わるだろうことを示す垣根に沿って、わたされることが可能。
+
+The window compositor may then start processing ahead of time and hand off the work to the display controller.
+ウィンドウ・コンポジタは、その後に、事前に処理を開始し、ディスプレイコントローラに作業を引き渡すことがあります。
+
+In this manner, the CPU work can be done ahead of time. 
+この方法で、CPUは前もって仕事を終えることが可能である。
+
+Once the GPU finishes, the display controller can immediately display the image.
+GPUが終わったら即座に、ディスプレイコントローラは画像を表示できる。
+
+The synchronization framework also allows implementers to leverage synchronization resources in their own hardware components.
+同期フレームワークは、実装者に、彼らのハードウェアコンポーネント内の同期的なリソースの活用を可能とする。
+
+Finally, the framework provides visibility into the graphics pipeline to aid in debugging.
+最終的に、フレームワークは、デバッグを助けるための、グラフィックパイプラインの可視性を、提供する
