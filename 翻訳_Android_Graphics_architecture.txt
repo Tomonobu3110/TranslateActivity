@@ -589,17 +589,53 @@ As you might expect, the frames generated for a virtual display are written to a
 
 ------------------------
 Case study: screenrecord
+ケーススタディ：screenrecord
 ------------------------
 
 Now that we've established some background on BufferQueue and SurfaceFlinger, it's useful to examine a practical use case.
+さて我々はバッファキューとサーフェスフリンジャーについての後ろ盾を確立した。それは実用的なユースケースの調査の役に立つ。
 
-The screenrecord command, introduced in Android 4.4, allows you to record everything that appears on the screen as an .mp4 file on disk. To implement this, we have to receive composited frames from SurfaceFlinger, write them to the video encoder, and then write the encoded video data to a file. The video codecs are managed by a separate process - called "mediaserver" - so we have to move large graphics buffers around the system. To make it more challenging, we're trying to record 60fps video at full resolution. The key to making this work efficiently is BufferQueue.
+The screenrecord command, introduced in Android 4.4, allows you to record everything that appears on the screen as an .mp4 file on disk.
+Android4.4で導入された、screenrecordコマンドは、あたたが画面に表示されているすべてのものを、ディスク上の .mp4 ファイルに記録することを可能とする。
 
-The MediaCodec class allows an app to provide data as raw bytes in buffers, or through a Surface. We'll discuss Surface in more detail later, but for now just think of it as a wrapper around the producer end of a BufferQueue. When screenrecord requests access to a video encoder, mediaserver creates a BufferQueue and connects itself to the consumer side, and then passes the producer side back to screenrecord as a Surface.
+To implement this, we have to receive composited frames from SurfaceFlinger, write them to the video encoder, and then write the encoded video data to a file.
+これを実現するために、サーフェスフリンジャーから合成されたフレームを受け取り、それをビデオエンコーダに書き込み、エンコードされたビデオをファイルに書き込む必要がある。
 
-The screenrecord command then asks SurfaceFlinger to create a virtual display that mirrors the main display (i.e. it has all of the same layers), and directs it to send output to the Surface that came from mediaserver. Note that, in this case, SurfaceFlinger is the producer of buffers rather than the consumer.
+The video codecs are managed by a separate process - called "mediaserver" - so we have to move large graphics buffers around the system.
+ビデオコーデックは mediaserver という別プロセスで管理されている、よって大きなグラフィックバッファをシステムの周りで動かさなければならない。
 
-Once the configuration is complete, screenrecord can just sit and wait for encoded data to appear. As apps draw, their buffers travel to SurfaceFlinger, which composites them into a single buffer that gets sent directly to the video encoder in mediaserver. The full frames are never even seen by the screenrecord process. Internally, mediaserver has its own way of moving buffers around that also passes data by handle, minimizing overhead.
+To make it more challenging, we're trying to record 60fps video at full resolution.
+もっとチャレンジングにしているのは、我々はフル解像度の60fpsのビデオの記録に挑戦している。
+
+The key to making this work efficiently is BufferQueue.
+この仕事を効果的にする鍵はバッファキューです。
+
+The MediaCodec class allows an app to provide data as raw bytes in buffers, or through a Surface.
+MediaCodecクラスはアプリにバッファ中の生バイト列、もしくはサーフェスを通してデータを供給させる。
+
+We'll discuss Surface in more detail later, but for now just think of it as a wrapper around the producer end of a BufferQueue.
+サーフェスについての詳細な議論は後にして、今はそれをバッファキューの生産者側のラッパだと考えよう。
+
+When screenrecord requests access to a video encoder, mediaserver creates a BufferQueue and connects itself to the consumer side, and then passes the producer side back to screenrecord as a Surface.
+screenrecordがビデオエンコーダにアクセスを要求すると、mediaserverはバッファキューを生成し、その消費者側に自分自身を接続し、生産者側をscreenrecordにサーフェスとして渡す。
+
+The screenrecord command then asks SurfaceFlinger to create a virtual display that mirrors the main display (i.e. it has all of the same layers), and directs it to send output to the Surface that came from mediaserver.
+つぎに、screenrecordコマンドは、サーフェスフリンジャーにメインディスプレイのミラーとなる仮想ディスプレイの生成を要求する(それはすべての同じレイヤを持つ)。そして、メディアサーバから来たサーフェスにダイレクトに送出するようにする。
+
+Note that, in this case, SurfaceFlinger is the producer of buffers rather than the consumer.
+なので、このケースでは、サーフェスフリンジャーは消費者というよりは、バッファの生産者である。
+
+Once the configuration is complete, screenrecord can just sit and wait for encoded data to appear.
+いったんコンフィグレーションが終われば、screenrecordはエンコードされたデータが現れるのをただ座って待つだけである。
+
+As apps draw, their buffers travel to SurfaceFlinger, which composites them into a single buffer that gets sent directly to the video encoder in mediaserver.
+アプリが描くように、それらのバッファが、 MediaServerの中にビデオエンコーダに直接送信される単一のバッファにそれらを合成する、 SurfaceFlingerへ移動する。
+
+The full frames are never even seen by the screenrecord process. 
+全フレームはscreenrecordプロセスから見えることはない。
+
+Internally, mediaserver has its own way of moving buffers around that also passes data by handle, minimizing overhead.
+内部的に、mediaserverは、バッファを動かす独自の方法を持っている。それはオーバーヘッドを最小化するためにハンドルでデータを渡す。
 
 ---------------------------------------
 Case study: Simulate Secondary Displays
