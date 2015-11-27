@@ -538,14 +538,21 @@ SurfaceFlinger's buffer handling demonstrates the fence-based buffer management 
 サーフェスフリンジャーのバッファ管理は、前述したフェンスベースの管理を言及している。
 
 If we're animating at full speed, we need to have an acquired buffer for the display ("front") and an acquired buffer for the next flip ("back").
+もしフルスピードでアニメーションすると、描画用のバッファ(フロント)の取得と、次のフリップ用のバッファ(バック)の取得が必要となる。
 
 If we're showing the buffer on an overlay, the contents are being accessed directly by the display and must not be touched.
+バッファをオーバーレイで表示しているとき、コンテンツはディスプレイから直接アクセスされるので、触ってはならない。
+
 But if you look at an active layer's BufferQueue state in the dumpsys SurfaceFlinger output, you'll see one acquired buffer, one queued buffer, and one free buffer.
+しかしもし、dumpsys SurfaceFlingerの出力でアクティブレイヤのバッファキューのステートを見るならば、ひとつの取得されたバッファと、ひとつのキューされたバッファと、ひとつの解放されたバッファを見るだろう。
 
 That's because, when SurfaceFlinger acquires the new "back" buffer, it releases the current "front" buffer to the queue.
+それは、サーフェスフリンジャーが新しいバックバッファを取得した時、それが現在のフロントバッファをキューにリリースしているからである。
 
 The "front" buffer is still in use by the display, so anything that dequeues it must wait for the fence to signal before drawing on it.
+フロントバッファはまだディスプレイによって使われているので、それをデキューするものは何であれ、フェンスがシグナルされるのを、それに描画する前に待たなければならない。
 
 So long as everybody follows the fencing rules, all of the queue-management IPC requests can happen in parallel with the display.
+全員がフェンスのルールに従う限り、キュー管理のすべては、IPC要求が表示と並行して発生することがある。
 
 
