@@ -1,0 +1,678 @@
+TV Input Framework
+テレビ入力フレームワーク
+
+The Android TV Input Framework (TIF) simplifies delivery of live content to Android TV. 
+アンドロイドテレビ入力フレームワーク(TIF)はアンドロイドTVに対するライブコンテンツ配信を単純化する。
+
+The Android TIF provides a standard API for manufacturers to create input modules for controlling Android TV, 
+and enables live TV search and recommendations via metadata published by the TV Input.
+TIFは、メーカーに、アンドロイドTVを制御するための入力モジュールを作るための標準APIを提供する。
+また、TV入力から提供されたメタデータをもととした、ライブTVの検索とお勧めを、できるようにする。
+
+The framework does not seek to implement TV standards or regional requirements,
+but does makes it easier for device manufacturers to meet regional digital TV broadcast standards without re-implementation. 
+TIFはTVの標準規格や地域別の要求を実装しようとはしない。
+が、しかし、デバイス開発メーカーが、再実装しないで、地域別のデジタルTV放送標準規格に meet することを簡単にする。
+
+Documentation in this section might also be useful to third-party app developers who want to create custom TV Inputs.
+このセクションの文書は、カスタマイズされたTV入力を作りたい、サードパーティアプリ開発者にとって、有用である。
+
+----------
+Components
+コンポーネント
+----------
+
+The Android TV Input Framework implementation includes a TV Input Manager.
+TIFの実装はTV Input Managerを含む
+
+The TIF works with the TV App, a system app that can’t be replaced by a third-party app, to access built-in and IP tuner channels.
+TIFはテレビアプリと一緒に動く、サードパーティが変更できないシステムアプリが組み込みもしくはIPのチューナチャンネルにアクセスする。
+
+The TV App communicates with TV Input modules supplied by the device manufacturer or other parties through the TV Input Manager.
+テレビアプリは、TV Input Managerを通じて、デバイス開発メーカーもしくはほかのパートナーから提供されたテレビ入力モジュールと communicates with する。
+
+The TV Input Framework consists of:
+TIFは下記からなる。
+
+* TV Provider (com.android.providers.tv.TvProvider): a database of channels, programs, and associated permissions
+テレビプロバイダ: チャンネルと番組のデータベース、パーミッションとの紐付け。
+
+* TV App (com.android.tv.TvActivity): the app that handles user interaction
+テレビアプリ：ユーザとのやり取りをするアプリ。
+
+* TV Input Manager (android.media.tv.TvInputManager): allows the TV Inputs to communicate with the TV App
+テレビ入力マネージャ： テレビ入力とアプリの通信を可能とする。
+
+* TV Input: an app representing physical or virtual tuners and input ports
+テレビ入力：物理的もしくは仮想的なチューナと入力ポートを示すアプリ
+
+* TV Input HAL (tv_input module): a hardware definition that allows system TV Inputs to access TV-specific hardware when implemented
+テレビ入力HAL：システムテレビ入力がテレビ独自のハードウェアにアクセスすることを可能とする、ハードウェア定義　(when inplemented)
+
+* Parental Control: the technology to allow blocking of channels and programs
+ペアレンタルコントロール(註：視聴制限)：チャンネルや番組をブロックするための技術
+
+* HDMI-CEC: the technology to allow remote control of various devices over HDMI
+HDMI-CEC: いろいろなHDMI機器をリモート制御するための技術
+
+These components are covered in detail below. 
+これらのコンポーネントの詳細については下記参照のこと。
+
+See the following diagram for a detailed view of the Android TV Input Framework architecture.
+TIFのアーキテクチャの詳細については、下記の図を参照のこと。
+
+Figure 1. Android TV Input Framework (TIF) architecture
+図１．TIFアーキテクチャ
+
+Flow:
+フロー
+----
+
+Here is how the architecture is exercised:
+このアーキテクチャがどうやって動くか？
+
+1. The user sees and interacts with the TV App, a system app that can’t be replaced by a third-party app.
+1. ユーザはテレビアプリで見たり操作したりする。サードパーティアプリでは置換できないシステムアプリ
+
+2. The TV App displays the AV content from the TV Input.
+2. テレビアプリはテレビ入力からの画音を表示する
+
+3. The TV App cannot talk directly with the TV Inputs. 
+3. テレビアプリは直接テレビ入力とは話せない。
+The TV Input Manager identifies the state of TV Inputs for the TV App. See TV Input Manager below for more details about these limitations.
+テレビ入力マネージャがテレビアプリの為にテレビ入力のステートを identifiy する。これらの制約の詳細については、下記のテレビ入力マネージャを参照のこと。
+
+-----------
+Permissions
+パーミッション
+-----------
+
+* Only signatureOrSystem TV Inputs and TV App have full access to the TV Provider database and are able to receive KeyEvents.
+署名された、もしくはシステムのテレビ入力とテレビアプリだけが、テレビプロバイダのデータベースへのフルアクセス件を持ち、キー配信を受けることができる。
+
+* Only system TV Inputs can access the TV Input HAL through the TV Input Manager service. TV Inputs are accessed one-to-one via TV Input Manager sessions.
+システムテレビ入力だけが、テレビ入力マネージャを通して、テレビ入力HALにアクセスできる。テレビインプットはテレビインプットマネージャのセッションに１：１に紐づけられる。
+
+* Third-party TV Inputs have package-locked access to the TV Provider database and can READ/WRITE only to matching package rows.
+サードパーティーテレビインプットは、パッケージロックドなテレビプロバイダーデータベースへのアクセス権限と　パッケージルールの範囲で、読み書きの権限を持つ。
+
+* Third-party TV inputs can either display their own content or content from a device manufacturer’s passthrough TV inputs, like HDMI1. 
+サードパーティーテレビインプットは、彼らの所有しているコンテンツか、デバイスメーカーのパススルーテレビ入力(HDM1のような)を表示できる。
+They can’t display content from non-passthrough TV inputs, like a built-in or IPTV tuner.
+たとえば、ビルトインのIPTVチューナのような、パススルーでないコンテンツは無理。
+
+* TV_INPUT_HARDWARE permission for a hardware TV Input app, signals the TV Input Manager Service to notify the TV Input service on boot to call the TV Input Manager Service and add its TV Inputs. 
+【？】TV_INPUT_HARDWARE、permission、ハードウェアテレビ入力アプリ、通知するための、テレビ入力マネージャの信号、テレビ入力サービス、ブート時、テレビ入力マネージャサービスを呼ぶための、あとそのテレビインプットを追加するための。
+
+This permission allows a hardware TV Input app to support multiple TV Inputs per TV Input service, as well as being able to dynamically add and remove its supported TV Inputs.
+このパーミッションは、テレビ入力アプリに、テレビ入力サービスごとに複数のテレビ入力のサポートを、許可する、また、サポートするテレビ入力の動的な追加・削除ができる。
+
+-----------
+TV Provider
+テレビプロバイダ
+-----------
+
+The TV Provider database stores the channels and programs from TV Inputs.
+テレビプロバイダデータベースはテレビ入力からのチャンネルと番組を格納する。
+
+The TV Provider also publishes and manages the associated permissions so that TV Inputs can see only their own records.
+テレビプロバイダは、紐づけられたパーミッションを、発行、管理する。なので、テレビ入力は自分が所有するレコードだけを見られる。
+
+For instance, a specific TV Input can see only the channels and programs it has supplied and is prohibited from accessing any other TV Inputs’ channels and programs.
+たとえば、特定のテレビ入力は、他のテレビインプットのチャンネルと番組から、供給され許可された、チャンネルと番組、だけ見られる、
+
+The TV Provider maps "broadcast genre" to "canonical genre" internally. 
+テレビプロバイダは放送ジャンルと標準ジャンルを内部的にマップする。
+
+TV Inputs are responsible for populating "broadcast genre" with the value in the underlying broadcast standard, 
+テレビ入力は、放送規格によって規定される、放送ジャンルとその値の populating について、責務を持つ。
+
+and the "canonical genre" field will automatically be populated with the correct associated genre from android.provider.TvContract.Genres.
+そして、標準ジャンルフィールドは、android.provider.TvCotract.Genres によって、自動的に、正しく紐づけられたジャンルに、設定される。
+
+For example, with broadcast standard ATSC A/65 and program with genre 0x25 (meaning “Sports”), 
+たとえば、ATSC A/65では、 0x25はスポーツを意味し、
+
+the TV Input will populate the “broadcast genre” with the String “Sports” and TV Provider will populate the “canonical genre” field with the mapped value android.provider.TvContract.Genres.SPORTS.
+テレビ入力はスポーツという文字列によって放送ジャンルを populate し、テレビプロバイダーは、android.provider.TvContract.Genres.SPORTにマップされた値によって、標準ジャンルを populate する。
+
+See the diagram below for a detailed view of the TV Provider.
+テレビプロバイダの詳細については下記の図を参照のこと
+
+Figure 2. Android TV Provider
+図2. テレビプロバイダ
+
+Only apps in the privileged system partition can read the entire TV Provider database.
+特権システムパーティションのアプリだけが、テレビプロバイダデータベースのすべてを閲覧できる。
+
+Passthrough TV inputs do not store channels and programs.
+パススルーテレビ入力はチャンネルや番組を格納しない。
+
+In addition to the standard fields for channels and programs, the TV Provider database also offers a BLOB type field, COLUMN_INTERNAL_PROVIDER_DATA, in each table that TV Inputs may use to store arbitrary data.
+あと、チャンネルと番組の標準フィールドについて、テレビプロバイダデータベースはCOLUMN_INTERNAL_PROVIDER_DATAというBLOBフィールドを提供していて、テレビ有力は各テーブルのこのフィールドを独自データの格納に使うかもしれない。
+
+That BLOB data can include custom information, such as frequency of the associated tuner, and may be provided in a protocol buffer or another form.
+このBLOBデータは独自情報を含むことができる。チューナ用の選局周波数とか、プロトコルバッファの一部とか、他の物とか。
+
+A Searchable field is available to make certain channels unavailable in search (such as to meet country-specific requirements for content protection).
+検索にひっかけたくないチャンネルについては、Searchableフィールドが使えます (コンテンツ保護についての各国独自の要求への対応など)
+
+
+Database field examples
+データベースフィールドの例
+
+The TV Provider supports structured data in channel (android.provider.TvContract.Channels) and program (android.provider.TvContract.Programs) tables.
+テレビプロバイダはチャンネルと番組テーブルで、構造化されたデータをサポートします。
+
+These tables are populated and accessed by TV Inputs and system apps like the TV App. 
+これらのテーブルは テレビ入力とテレビアプリのようなシステムアプリによって、populated と結ぶ付けが行われます。
+
+These tables have four types of fields:
+これらのテーブルは以下の4種類のタイプのフィールドを持ちます。
+
+* Display: Display fields contain information that apps may want to make visible to the user, like a channel’s name (COLUMN_DISPLAY_NAME) or number (COLUMN_DISPLAY_NUMBER), or the title of the program being viewed.
+ディスプレイ： ディスプレイフィールドはアプリがユーザに提供したいかもしれない情報を持ちます。たとえばチャンネル名、チャンネル番号、番組のタイトルとか。
+
+* Metadata: There are three fields for identifying content, according to relevant standards, like a channel’s transport stream ID (COLUMN_TRANSPORT_STREAM_ID), original network ID (COLUMN_ORIGINAL_NETWORK_ID) and service id (COLUMN_SERVICE_ID).
+メタデータ：関連した放送規格に規定される、コンテンツをidentifyするための3つのフィールド。すなわち、TSID, ONID, ServiceID。
+
+* Internal data: Fields that are for the custom use of TV Inputs.
+内部データ：テレビインプットによって独自に利用されるフィールド
+
+Some fields, like COLUMN_INTERNAL_PROVIDER_DATA, are customizable BLOB fields where a TV Input can store arbitrary metadata about their channel or program.
+COLUMN_INTERNAL_PROVIDER_DATAのようなフィールドはカスタマイズ可能なBLOBフィールドで、テレビ入力はチャンネルや番組の任意・独自のデータを格納できます。
+
+* Flag: Flag fields represent whether a channel should be restricted from search, browse, or viewing. 
+フラッグ：フラッグフィールドはチャンネルの検索、ブラウズ、視聴についての制限を示します。
+This can be set only at the channel level. All programs defer to the setting on the channel.
+これはチャンネル単位での設定になります。番組はチャンネルの設定に従います。
+
+** COLUMN_SEARCHABLE: Restricting search from some channels may be a requirement in certain regions. COLUMN_SEARCHABLE = 0 means the channel should not be exposed in search results.
+COLUMN_SEARCHABLE: チャンネルの検索制限。いくつかの地域での要求による。0の場合、検索結果に表示されてはいけない。
+
+** COLUMN_BROWSABLE: Visible to system applications only. Restricting channel from being browsed by applications. COLUMN_BROWSABLE = 0 means the channel should not be included in the channel list.
+COLUMN_BROWSABLE:　システムアプリだけで見える。アプリからのブラウズは制限される。0はチャンネルがチャンネルリストに含まれるべきでないことを意味する。
+
+** COLUMN_LOCKED: Visible to system applications only. Restricting channel from being viewed by invalid accounts without entering PIN code. COLUMN_LOCKED = 1 means the channel should be protected by parental control.
+COLUMN_LOCKED: システムアプリだけに見える。見るためにはPINコードの入力が必要。1はチャンネルがペアレンタルコントロールで保護されるべきであることを意味する。
+
+For a more exhaustive list of the fields, see
+全リストは以下を参照のこと。
+android/frameworks/base/media/java/android/media/tv/TvContract.java
+
+Permissions and access control
+パーミッションとアクセス制御
+
+All fields are visible to anyone with access to the corresponding row. No fields are directly accessible to users; they see only what the TV App, System apps, or TV Inputs surface.
+全てのフィールドは、対応する列にアクセスする、誰に対しても可視である。ユーザが直接アクセスできるフィールドはない。ユーザはテレビアプリ、システムアプリ、テレビ入力さーふぇすしか見ない。
+
+* Each row has PACKAGE_NAME, the package (app) that owns that row, checked on Query, Insert, Update via TvProvider.java. A TV Input may access only the information it wrote and is cordoned off from the information provided by other TV Inputs.
+各行(row)は、どのパッケージがその行を保持しているかを示す、PACKAGE_NAMEを持つ。テレビプロバイダを通したQuery, Insert, Updateの際にチェックされる。テレビ入力は、自分が書いた、もしくはほかのテレビ入力によって cordoned off された情報にだけアクセスするかもしれない。
+
+* READ, WRITE permissions via AndroidManifest.xml (requires user consent) to determine available channels.
+AndroidManifest.xmlの読み込み・書き込みパーミッションは利用可能なチャンネルを判定する。
+
+* Only signatureOrSystem apps can acquire ACCESS_ALL_EPG_DATA permission to access the entire database.
+署名されたもしくはシステムのアプリだけが、データベースのすべてにアクセスできる、ACCESS_ALL_EPG_DATA 権限を、取得できる。
+
+Permissions and access control
+パーミッションとアクセス制御
+
+All fields are visible to anyone with access to the corresponding row. No fields are directly accessible to users; they see only what the TV App, System apps, or TV Inputs surface.
+全てのフィールドは、対応する列にアクセスする、誰に対しても可視である。ユーザが直接アクセスできるフィールドはない。ユーザはテレビアプリ、システムアプリ、テレビ入力さーふぇすしか見ない。
+
+* Each row has PACKAGE_NAME, the package (app) that owns that row, checked on Query, Insert, Update via TvProvider.java. A TV Input may access only the information it wrote and is cordoned off from the information provided by other TV Inputs.
+各行(row)は、どのパッケージがその行を保持しているかを示す、PACKAGE_NAMEを持つ。テレビプロバイダを通したQuery, Insert, Updateの際にチェックされる。テレビ入力は、自分が書いた、もしくはほかのテレビ入力によって cordoned off された情報にだけアクセスするかもしれない。
+
+* READ, WRITE permissions via AndroidManifest.xml (requires user consent) to determine available channels.
+AndroidManifest.xmlの読み込み・書き込みパーミッションは利用可能なチャンネルを判定する。
+
+* Only signatureOrSystem apps can acquire ACCESS_ALL_EPG_DATA permission to access the entire database.
+署名されたもしくはシステムのアプリだけが、データベースのすべてにアクセスできる、ACCESS_ALL_EPG_DATA 権限を、取得できる。
+
+----------------
+TV Input Manager
+テレビ入力マネージャ
+----------------
+
+The TV Input Manager provides a central system API to the overall Android TV Input Framework.
+テレビ入力マネージャは、TIFの包括的な、中心的システムAPIを提供します。
+
+It arbitrates interaction between apps and TV Inputs and provides parental control functionality.
+アプリケーションとテレビ入力のインタラクションを調停し、ペアレンタルコントロールの機能を提供します。
+
+TV Input Manager sessions must be created one-to-one with TV Inputs. 
+テレビ入力マネージャのセッションはテレビ入力に対して１：１に作られなければいけません。
+
+The TV Input Manager allows access to installed TV Inputs so apps may:
+テレビ入力マネージは許可します、インストールされたテレビ入力へのアクセス、なのでアプリはｘｘｘかもしれない：
+
+* List TV inputs and check their status
+テレビ入力を列挙し、それらの状態をチェックする。
+
+* Create sessions and manage listeners
+セッションを作成し、リスナを管理する。
+
+For sessions, a TV Input may be tuned by the TV App only to URIs it has added to the TV Provider database, except for passthrough TV Inputs which can be tuned to using TvContract.buildChannelUriForPassthroughInput().
+セッションについては、テレビ入力は、テレビアプリによって、テレビプロバイダデータベースに追加された、TvContract.buildChannelUriForPassthroughInputを利用して選局可能な、パススルーテレビ入力をを除いた、URIによって、選局されるかもしれない。
+
+A TV Input may also have its volume set.
+テレビ入力はボリュームセットも持つかもしれない。
+
+TV Inputs provided and signed by the device manufacturer (signature apps) or other apps installed in the system partition will have access to the entire TV Provider database.
+【？】テレビ入力、提供され、署名された、デバイスメーカーもしくは、システムパーティションにインストールされた、他のアプリ、はすべてのテレビプロバイダデータベースへのアクセスを持つ。
+
+This access can be used to construct apps to browse and search across all available TV channels and programs.
+このアクセス権は、すべての利用可能なチャンネルと番組をブラウズしたり検索したりするアプリケーションの構築に利用できる。
+
+An app may create and register a TvInputCallback with the android.media.tv.TvInputManager to be called back on a TV Input’s state change or on the addition or removal of a TV Input.
+アプリケーションは、android.media.tvInputManagerと共に、テレビ入力のステート変化、もしくは、テレビ入力の追加削除の時に、コールバックされる TvInputCallback を作り、登録するかもしれない。
+For example, a TV App can react when a TV Input is disconnected by displaying it as disconnected and preventing its selection.
+たとえば、テレビアプリは、テレビ入力が切断された際に、それを表示することによって選択されないように、応答できる。
+
+The TV Input Manager abstracts communication between the TV App and TV Inputs.
+テレビ入力マネージャはテレビアプリとテレビ入力のコミュニケーションを抽象化する。
+
+The standard interface of TV Input Manager and TV Input allows multiple device manufacturers to create their own TV Apps while helping all third-party TV Inputs work on all TV Apps.
+テレビ入力マネージャとテレビ入力の標準インターフェースは、複数のデバイスメーカーが彼らの独自のテレビアプリを作っても、それらが、すべてのサードパーティのテレビ入力とともに動作することを助ける。
+
+---------
+TV Inputs
+テレビ入力
+---------
+
+TV Inputs are Android apps in the sense they have an AndroidManifest.xml and are installed (via Play, pre-installed, or sideloaded). 
+テレビ入力は AndroidManifest.xmlをもち、インストールされる、アンドロイドアプリである。
+
+Android TV supports pre-installed system apps, apps signed by the device manufacturer and third-party TV Inputs.
+アンドロイドTVはプレインストールアプリ、デバイスメーカーに署名されたアプリ、サードパーティーのテレビ入力をサポートする。
+
+Some inputs, like the HDMI input or built-in tuner input, can be provided only by the manufacturer as they speak directly with the underlying hardware.
+HDMIやビルトインチューナのような、ハードウェアと直接通信するタイプの入力は、メーカーだけが提供できる。
+
+Others, such as IPTV, place-shifting, and external STB, can be supplied by third parties as APKs on Google Play Store. 
+IPTV、プレースシフト、外部STBのようなほかのものは、サードパーティがGoogle Play StoreにAPKで置いて供給できる。
+
+Once downloaded and installed, the new input can be selected within the TV App.
+ダウンロード、インストールされれば、テレビアプリから選択できるようになる。
+
+Passthrough input example
+パススルー入力の例
+
+Figure 3. Android TV System Input
+図３. アンドロイドテレビシステム入力
+
+In this example, the TV Input provided by the device manufacturer is trusted and has full access to the TV Provider.
+この例では、デバイスメーカが提供したテレビ入力が信頼され、テレビプロバイダに対するフルアクセス権を持っている。
+
+As a passthrough TV Input, it does not register any channels or programs with the TV Provider.
+パススルーテレビ入力に関しては、テレビプロバイダにいかなるチャンネルも番組も登録しない。
+
+To obtain the URI used to reference the passthrough input, use the android.media.tv.TvContract utility method buildChannelUriForPassthroughInput(String inputId). 
+パススルー入力を指し示すURIを取得するには、android.media.tv.TvCotractのユーティリティメソッド buildChannelUriForPassthroughInput()を使う。
+
+The TV App communicates with the TV Input Manager to reach the HDMI TV Input.
+テレビアプリはテレビ入力マネージャと通信し、HDMIテレビ入力にたどり着く。
+
+Built-in tuner example
+ビルトインチューナの例
+
+Figure 4. Android TV Built-in Tuner Input
+図４．アンドロイドテレビビルトインチューナ入力
+
+In this example, the Built-in Tuner TV Input provided by the device manufacturer is trusted and has full access to the TV Provider.
+この例では、デバイスメーカが提供したビルトインチューナ入力は信頼され、テレビプロバイダに対するフルアクセス権を持っている。
+
+Third-party input example
+サードパーティー入力の例
+
+Figure 5. Android TV third-party input
+図５．アンドロイドテレビ、サードパーティー入力
+
+In this example, the external STB TV Input is provided by a third party. 
+この例では、外部STBテレビ入力はサードパーティーが提供している。
+
+Since that TV Input can’t directly access the HDMI video feed coming in, it must go through the TV Input Manager and use the HDMI TV Input provided by the device manufacture.
+テレビ入力がHDMIビデオの入力に直接アクセスできないので、テレビ入力マネージャを経由し、デバイスメーカが提供しているHDMIテレビ入力を利用し開ければいけない。
+
+Through the TV Input Manager, the external STB TV Input can speak with the HDMI TV Input and ask it to show the video on HDMI1.
+テレビ入力マネージャを通して、外部STBテレビ入力はHDMIテレビ入力と会話ができ、ビデオをHDMI1に表示することを依頼できる。
+
+So the STB TV Input can control the TV while the manufacturer-provided HDMI TV Input renders the video.
+なので、STBテレビ入力は、メーカー提供のHDMIテレビ入力がビデオを描画することを制御できる。
+
+Picture in picture (PIP) example
+PIPの例
+
+Figure 6. Android TV KeyEvents
+図６．アンドロイドテレビ、キーイベント
+
+The diagram above shows how buttons on a remote control are passed to a specific TV Input for picture in picture (PIP) display.
+上の図は、PIPの時に、押されたリモコンのボタンがどのように特定のTV入力に渡されるかを説明している。
+
+Those button presses are interpreted by the hardware driver supplied by the device manufacturer, 
+これらのボタンの押下はデバイスメーカが提供したハードウェアドライバによって翻訳され、
+
+converting hardware scancodes to Android keycodes and passing them to the standard Android input pipeline InputReader and InputDispatcher functions as KeyEvents. 
+ハードウェアのスキャンコードからアンドロイドのキーコードに変換され、それらは標準的なアンドロイドの入力パイプライン InputRender そして、InputDispatcher関数にキーイベントとして渡される。
+
+These in turn trigger events on the TV App if it is in focus.
+【？】これらは、フォーカスされているほうのテレビアプリの選局トリガーイベントである。
+
+Only system TV Inputs are eligible to receive InputEvents, and only if they have the RECEIVE_INPUT_EVENT system permission.
+システムテレビ入力のみが、RECEIVE_INPUT_EVENTシステムパーミッションを持つときだけに、入力イベントを受信する資格を持つ。
+
+The TV Input is responsible to determine which InputEvents to consume and should allow the TV App to handle the keys it does not need to consume.
+テレビインプットは、どの入力イベントを消費し、消費されなかったキーについては、テレビアプリにハンドリングを許可するか、決定する責務を持つ。
+
+The TV App is responsible for knowing which system TV Input is active, meaning selected by the user, 
+テレビアプリは、どのシステムテレビ入力がアクティブ、すなわちユーザによって選択されているか、を、知る責務を持つ。
+
+and to disambiguate incoming KeyEvents and route them to the correct TV Input Manager session, calling dispatchInputEvent() to pass on the event to the associated TV Input.
+そして、やってきたキーイベントのあいまいさをなくし、関連付けられたテレビ入力にイベントを渡すために、dispachInputEvent()関数をコールして、それらを正しいテレビ入力マネージャのセッションにルーティングする責務を持つ。
+
+MHEG-5 input example
+MHEG-5 入力の例
+
+The following diagram shows a more detailed view of how KeyEvents are routed through the Android TIF.
+下記の図は、TIFでキーイベントどのようにルーティングされるかの詳細を示している。
+
+Figure 7. Android TV Red button example
+図７．アンドロイドテレビ、赤ボタンの例
+
+It depicts the flow of a Red button app, common in Europe for letting users access interactive apps on their televisions.
+図は、ヨーロッパでポピュラーな、ユーザにテレビのインタラクティブアプリにアクセスさせるための、「赤ボタンアプリ」を示している。
+
+An app can be delivered over this transport stream.
+アプリは選局中のTSで運ばれることが可能。
+
+When the button is clicked, it lets users interact with these broadcast apps.
+ボタンがクリックされると、ユーザにこれらの放送アプリの利用を開始させる。
+
+For example, you might use these broadcast apps to access related web pages or sports scores.
+たとえば、あなたはテレビに関連するウェブページやスポーツの結果にアクセスするかもしれない。
+
+See the Broadcast app section to learn how broadcast apps interact with the TV App.
+テレビアプリと放送アプリのインタラクションについて学ぶには、放送アプリのセクションを参照してください。
+
+In this example:
+この例で...
+
+1. The TV App is in focus and receives all keys.
+テレビアプリはフォーカスをもちすべてのキーを受け取る。
+
+2. KeyEvents (e.g. the Red button) is passed to the active TV Input as InputEvents.
+キーイベント(例：赤ボタン)が InputEvents としてアクティブなテレビ入力に渡す。
+
+3. The system TV Input integrates with MHEG-5 stack and has the RECEIVE_INPUT_EVENT system permission.
+システムのテレビはMHEG-5とインテグレートされ、RECEIVE_INPUT_EVENTシステムパーミッションを持つ。
+
+4. On receiving activation keycode (e.g. Red button), the TV Input activates broadcast app.
+アクティベーションキーコード(例：赤ボタン)を受信すると、テレビ入力は放送アプリを起動する。
+
+5. TV input consumes KeyEvents as InputEvents and the broadcast app is the focus and handles InputEvents until dismissed.
+テレビ入力は入力イベントとしてのキーイベントを消費し、放送アプリはフォーカスされた状態になり、消えるまで、入力イベントをハンドルする。
+
+Note: Third-party TV inputs never receive keys.
+注意：サードパーティーテレビ入力はキーを受信することはない。
+
+------------
+TV Input HAL
+テレビ入力HAL
+------------
+
+The TV Input HAL aids development of TV Inputs to access TV-specific hardware.
+テレビ入力HALはテレビ固有のハードウェアにアクセスするテレビ入力の開発を助ける。
+
+As with other Android HALs, the TV Input HAL (tv_input) is available in the AOSP source tree and the vendor develops its implementation.
+他のアンドロイドHALのように、テレビ入力HALはAOSPソースツリーで利用可能で、各ベンダーがその実装部分を開発する。
+
+------
+TV App
+テレビアプリ
+------
+
+The TV App provides channel and program search results (via com.android.tv.search.TvProviderSearch) and passes keys, tune, and volume calls to TV Inputs through the TV Input Manager.
+テレビアプリは、テレビ入力マネージャを通して、チャンネルと番組の検索結果、押されたキー、チューニング、ボリュームをテレビ入力に提供する
+
+Manufacturers must implement the TV App to ensure search functions work for their users.
+メーカーは、彼らのユーザの為に、検索機能がきちんと動作するように保証するテレビアプリを実装しなければならない。
+
+Otherwise, users will struggle to navigate the resulting Android TV. 
+さもなければ、ユーザはアンドロイドテレビをナビゲートするのに苦労する。
+
+Third-party developers cannot develop TV Apps as the APIs require system or signature permission.
+サードパーティーの開発者はシステムパーミッションやシグネチャパーミッションのAPIを使ったテレビアプリを開発できない。
+
+As with the TIF in general, the TV App does not seek to implement device manufacturer or country-specific features.
+TIFでは一般的に、テレビアプリはデバイスメーカの実装や各国独自の機能をシークしない。
+
+Instead, it handles these tasks by default:
+代わりに、デフォルトでこれらのタスクをハンドルする
+
+Setup and configuration
+セットアップとコンフィグレーション
+
+* Auto-detect TV Inputs
+テレビ入力の自動検出
+
+* Let TV Inputs initiate channel setup
+チャンネルセットアップ(テレビ入力の初期化)
+
+* Control parental settings
+ペアレンタルコントロールの設定
+
+* Alter TV settings
+テレビ設定の変更
+
+** Edit channel
+チャンネル編集
+
+Viewing
+視聴
+
+* Access and navigate all TV channels
+全てのチャンネルへのアクセスとナビゲート
+
+* Access TV program information bar
+番組情報表示
+
+* Multiple audio and subtitle track support
+複数音声トラック、字幕トラックのサポート
+
+* Parental control PIN challenge
+ペアレンタルコントロールのPIN入力
+
+* Allow TV Input UI overlay for:
+UIのオーバーレイの許可
+
+** TV standard (HbbTV, etc.)
+テレビ標準規格 (HbbTVとか)
+
+----------------
+Parental Control
+ペアレンタルコントロール
+----------------
+
+Parental control lets a user block undesired channels and programs, but bypass the block by entering a PIN code.
+ペアレンタルコントロールはユーザーに希望しないチャンネルやプログラムのブロックをさせる。PINを打つことでブロックをバイパスできる。
+
+Responsibility for parental control functionality is shared amongst the TV App, TV Input Manager service, TV Provider, and TV Input.
+ペアレンタルコントロール機能の実装責務は、テレビアプリ、テレビ入力マネージャサービス、テレビプロバイダ、テレビ入力に分散している。
+
+TV Provider
+テレビプロバイダの責務
+
+Each channel row has a COLUMN_LOCKED field that is used to lock specific channels from viewing without entering a PIN code.
+全てのチャンネルの行は COLUMN_LOCKED フィールドを持っていて、これはPINなしでは見られないチャンネルの指定に使われる。
+
+The program field COLUMN_CONTENT_RATING is intended for display and is not used to enforce parental control.
+プログラムの COLUMN_CONTENT_RATING フィールドは表示目的であり、ペアレンタルコントロールの実施には用いられない。
+
+TV Input Manager
+テレビ入力マネージャ
+
+The TV Input Manager stores every blocked TvContentRating and responds to isRatingBlocked() to advise if content with the given rating should be blocked.
+れれび入力マネージャはブロックされたそれぞれのTvContentRatingを格納する。また、isRatingBlocked()に応答する。これは、コンテンツが与えられたレーティングにおいてブロックされるべきかをアドバイスする関数。
+
+TV Input
+テレビ入力
+
+The TV Input checks if the current content should be blocked by calling isRatingBlocked() on the TV Input Manager when the rating of the displayed content has changed (on program or channel change), or parental control settings have changed (on ACTION_BLOCKED_RATINGS_CHANGED and ACTION_PARENTAL_CONTROLS_ENABLED_CHANGED).
+テレビ入力は、テレビ入力マネージャのisRatingBlocked()を呼ぶことによって、現在のコンテンツがブロックされるべきか、どうかチェックする。このチェックは、表示しているコンテンツのレーティングが変化した時(番組かチャンネルの変更による)、もしくはペアレンタルコントロールの設定が変わった(ACTION_BLOCKED_RATINGS_CHANGED か ACTION_PARENTAL_CONTROLS_ENABLED_CHANGED)ときに実施される。
+
+If the content should be blocked, the TV Input disables the audio and video and notifies the TV app that the current content is blocked by calling notifyContentBlocked(TvContentRating).もしコンテンツがブロックされるべきであれば、テレビ入力は画音を無効にして、テレビアプリに今のコンテンツがブロックされていることを通知する(TvContentRatingのnotifyContentBlockedを呼ぶ)。
+
+If the content should not be blocked, the TV Input enables audio and video and notifies the TV App the current content is allowed by calling notifyContentAllowed().
+もしコンテンツがブロックされるべきでなければ、テレビ入力は画音を有効にして、テレビアプリにコンテンツが許可されていることを通知する(notifyContentAllowdを呼ぶ)。
+
+TV App
+テレビアプリ
+
+The TV App shows parental control settings to users and a PIN code UI when it is notified by a TV Input that the current content is blocked or when the user attempts to view a blocked channel.
+テレビアプリはペアレンタルコントロールの設定とPINコード入力画面をユーザに提示する。PINコード入力画面は、テレビインプットが、現在コンテンツがブロックされていることを通知した時、もしくはユーザがブロックされたコンテンツを見ようとしたときに表示する。
+
+The TV App does not directly store the parental control settings.
+テレビアプリは直接にペアレンタルコントロール設定を store しない。
+
+When the user changes the parental control settings, every blocked TvContentRating is stored by the TV Input Manager, and blocked channels are stored by the TV Provider.
+ユーザがペアレンタルコントロール設定を変更した際は、すべてのブロックされた TvContentRatingはテレビ入力マネージャによって store される。また、ブロックチャンネルはテレビプロバイダによりストアされる。
+
+--------
+HDMI-CEC
+--------
+
+HDMI-CEC allows one device to control another, thereby enabling a single remote to control multiple appliances in a home theater.
+HDMI-CECはデバイスが他のデバイスを制御できるようにする。それによって、一個のリモコンでホームシアターの複数の装置を制御できる。
+
+It is used by Android TV to speed setup and allow distant control over various TV Inputs via the central TV App.
+それはアンドロイドテレビの speed setup で利用され、また中心的テレビアプリを通じた色々なテレビ入力の遠隔操作を可能とする。
+
+For instance, it may switch inputs, power up or down devices, and more.
+たとえば、入力切替とか、電源ON/OFFとか、いろいろ。
+
+The Android TIF implements HDMI-CEC as the HDMI Control Service so that device manufacturers merely need to develop low-level drivers that interact with the lightweight Android TV HAL, skipping more complex business logic.
+アンドロイドTIFは HDMI-CECを HDMI Cntrol Service として実装している。なので、デバイスメーカーは、軽量なアンドロイドテレビHALとのインタ楽とをする低レベルなドライバの開発を必要とすることは、まれである。もっと複雑なビジネスロジックをスキップする。
+
+In providing a standard implementation, Android seeks to mitigate compatibility issues by reducing fragmented implementations and selective feature support.
+標準的な実装を提供するのに、アンドロイドは、断片的な実装の削減と選択的な機能のサポートによって、互換性問題を緩和しようとする。
+
+The HDMI Control Service uses the existing Android services, including input and power.
+HDMI Control Serviceは入力や電源を含めた既存のアンドロイドサービスを利用する。
+
+This means existing HDMI-CEC implementations will need to be redesigned to interoperate with the Android TIF.
+これは、HDMI-CECの実装はAidroid TIFとの相互運用性の為の再デザイン必要とする、ということを意味します。
+
+We recommend the hardware platform contain a microprocessor to receive CEC power on and other commands.
+我々は、ハードウェアプラットフォームがCECの電源ONやほかのコマンドを受信するマイコンを積むことを、お勧めする。
+
+Figure 8. CEC integration on Android TV
+図８．アンドロイドテレビでのCECインテグレーション
+
+1. The CEC bus receives a command from the currently active source to switch to a different source.
+CECバスは、現在アクティブなソースから、他のソースに変更するためのコマンドを受信する
+
+2. The driver passes the command to the HDMI-CEC HAL.
+ドライバーはそのコマンドをHDMI-CEC HALに送る
+
+3. The HAL notifies all ActiveSourceChangeListeners.
+HALはすべてのActiveSourceChangeLisnterに通知する
+
+4. The HDMI Control Service is notified of source change via ActiveSourceChangeListener.
+HDMI Control Serviceは ActiveSourceChangeListenerを通して、ソースの変更に気がつく
+
+5. The TV Input Manager service generates an intent for the TV App to switch the source.
+テレビ入力マネージャはテレビアプリがソースを切り替えるための intent を作る
+
+6. The TV App then creates a TV Input Manager Session for the TV Input being switched to and calls setMain on that session.
+そして、テレビアプリは、変更先であり、setMainが呼ばれるであろうテレビ入力の為に、テレビ入力マネージャセッションを生成する。
+
+7. The TV Input Manager Session passes this information on to the HDMI TV Input.
+テレビ入力マネージャセッションはこの情報を HDMI TV 入力にわたす。
+
+8. The HDMI TV input requests to set sideband surface.
+HDMI TV 入力はサイドバンドサーフェースの設定を要求する
+
+9. The TV Input Manager Service generates a corresponding routing control command back to HDMI Control Service when the surface is set.
+テレビ入力マネージャサービスは、サーフェースがセットされたときに、HDMIコントロールサービスに対して、関連したコントロールコマンド戻し用のルートを、生成する。
+
+-------------------------
+TV integration guidelines
+テレビ組み込みのガイドライン
+-------------------------
+
+Broadcast app
+放送アプリ
+
+Because each country has broadcast-specific requirements (MHEG, Teletext, HbbTV, and more), manufacturers are expected to supply their own solutions for the broadcast app, for example:
+各国が放送の特別要件を持っているので、メーカーは、放送アプリの各々のソリューションの供給を期待する。たとえば...
+
+MHEG: native stack
+MHEGはネイティブ
+
+Teletext: native stack
+Teletextもネイティブ
+
+HbbTV: webkit modification by Opera browser
+HbbTVはOperaブラウザのWebkitの変更で。
+
+In the Android L release, Android TV expects device manufacturers to use systems integrators or the Android solutions for regional TV stacks, pass the surface to TV software stacks, or pass the necessary key code to interact with legacy stacks.
+【？】アンドロイドＬでは、アンドロイドテレビは、デバイスメーカーに、地域別のテレビスタックに対して、システムのインテグレータを、もしくはアンドロイドのソリューションを、使うことを期待する。サーフェスをテレビソフトスタックに渡すとか、キーコードをレガシーのスタックに渡すとかで、
+
+Here’s how the broadcast app and TV App interact:
+
+1. The TV App is in focus, receiving all keys.
+テレビアプリがフォーカスをもち、すべてのキーを受ける。
+
+2. The TV App passes keys (e.g. Red button) to the TV Input device.
+テレビアプリがキー(たとえば赤ボタンとか)をテレビ入力デバイスに渡す。
+
+3. The TV Input device internally integrates with legacy TV stack.
+テレビ入力デバイスは内部でレガシーなテレビスタックを抱えている。
+
+4. On receiving an activation keycode (e.g. Red button), the TV Input device activates broadcast apps.
+起動キーコードを受信したとき、テレビ入力デバイスは放送アプリを起動する。
+
+5. A broadcast app takes focus in the TV App and handles user actions.
+放送アプリがフォーカスを取得し、ユーザの操作をハンドルする。
+
+For voice search/recommendation, the broadcast app may support In-app search for voice search.
+音声サーチやレコメンについては、放送アプリは In-app search for voice searchをサポートするだろう。
+
+DVR
+録画
+
+Android TV supports digital video recording (DVR) with device manufacturer development. 
+アンドロイドテレビは、デバイスメーカーの実装ありで、、デジタル放送録画をサポートしている。
+
+The DVR function works like so:
+録画機能はこんな風に動く：
+
+1. DVR recording function / Live Buffer can be implemented by any TV Input.
+放送録画機能、追っかけ再生は、いずれかのテレビ入力で実装される。
+
+2. TV App passes on key inputs to TV Input (including recording/pause/fast forward/ rewind keys).
+テレビアプリはテレビ入力にキー入力を渡す (録画ボタン、ポーズ、早送り、巻き戻し)
+
+3. When playing the recorded content, the TV Input handles it with trick play overlay.
+録画再生中は、テレビ入力がトリックプレイオーバレイと共にそれをハンドルする。
+
+4. DVR app enables users to browse and manage recorded program.
+録画アプリはユーザに録画番組の閲覧と編集を可能とする。
+
+For voice search/recommendation:
+音声サーチとレコメンについて：
+
+* DVR app supports In-app search for Voice search.
+録画アプリは In-app search for Voice search をサポートする。
+
+* DVR app can propose recommendation using notifications.
+録画アプリは通知を利用したレコメンを提案できる。
+
+See the following diagram for a view into a possible DVR implementation in Android TV.
+アンドロイドで可能な録画の実装については、下記をご覧ください。
+
+Figure 9. Digital video recording in Android TV
+図９．アンドロイドテレビでの放送録画
+
+[EOF]
